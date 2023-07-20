@@ -1,6 +1,7 @@
 
+import os
 import subprocess
-import os 
+
 
 def anarci(seq):
     command="ANARCI --scheme aho -i %s" % seq
@@ -43,13 +44,17 @@ def trim_mhc(seq, type, root_dir, out_dir):
     with open(tmpfn, 'w') as fh:
         fh.write(">tmp\n%s\n" % seq)
     
-    hmmcmd="hmmsearch --noali %s %s" % (hmmfile,tmpfn)
-    hmmout=subprocess.getoutput(hmmcmd)
+    hmmcmd = f"hmmsearch --noali '{hmmfile}' '{tmpfn}'"
+    try:
+        output = subprocess.check_output(hmmcmd, shell=True, stderr=subprocess.STDOUT)
+        output = output.decode("utf-8")  # decode bytes to string
+    except subprocess.CalledProcessError as e:
+        print(f"HMMER failed for command {hmmcmd} with error: {e.output.decode('utf-8')}")
 
     os.remove(tmpfn)
     start=0
     end=0
-    hmmout=hmmout.split("\n")
+    hmmout=output.split("\n")
     for i,line in enumerate(hmmout):
         if "Domain annotation for each sequence" in line:
             line=hmmout[i+4]
@@ -57,7 +62,7 @@ def trim_mhc(seq, type, root_dir, out_dir):
             end=int(line[67:74])
             break
     if start == 0 or end == 0:
-        return "none"
+        raise Exception("HMMER failed to find domain.")
     else:
         start-=1
         return seq[start:end]
